@@ -21,6 +21,13 @@ type SMALL_RECT struct {
 	Bottom int16
 }
 
+type RECT struct {
+	Left   int32
+	Top    int32
+	Right  int32
+	Bottom int32
+}
+
 type CONSOLE_SCREEN_BUFFER_INFO struct {
 	dwSize              Coord
 	dwCursorPosition    Coord
@@ -39,6 +46,8 @@ var (
 	getWindowTextProc    = user32.NewProc("GetWindowTextW")
 	setWindowPosProc     = user32.NewProc("SetWindowPos")
 	moveWindowProc       = user32.NewProc("MoveWindow")
+	getDesktopWindowProc = user32.NewProc("GetDesktopWindow")
+	getWindowRectProc    = user32.NewProc("GetWindowRect")
 )
 
 const (
@@ -58,6 +67,17 @@ func MoveWindow(hwnd syscall.Handle, X int, Y int, nWidth int, nHeight int, bRep
 		}
 	}
 	return
+}
+
+func GetDesktopWindow() (hwnd syscall.Handle, err error) {
+	handle, _, e1 := getDesktopWindowProc.Call()
+	return syscall.Handle(handle), e1
+}
+
+func GetWindowRect(hwnd syscall.Handle) (RECT, error) {
+	var rect RECT
+	_, _, e1 := getWindowRectProc.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&rect)))
+	return rect, e1
 }
 
 func enumWindows(enumFunc uintptr, lparam uintptr) (err error) {
