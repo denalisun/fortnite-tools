@@ -2,8 +2,10 @@ package main
 
 import (
 	"os"
+	"syscall"
 
 	"github.com/denalisun/fortnite-tools/core"
+	"github.com/denalisun/fortnite-tools/utilities"
 )
 
 func makeMainMenu() {
@@ -55,6 +57,14 @@ func main() {
 	makeMainMenu()
 	makeFOVMenu()
 
-	core.PrintCurrentMenu()
-	core.HandleControls()
+	fnWindow, _ := utilities.FindWindow("Fortnite  ")
+	defer syscall.CloseHandle(fnWindow)
+
+	utilities.MoveWindow(fnWindow, 0, 170, 2560, 1100, 0)
+	// if fortnitePID, _ := utilities.GetFortnitePID(); fortnitePID > 0 {
+	// 	fmt.Println(fortnitePID)
+	// }
+
+	//core.PrintCurrentMenu()
+	//core.HandleControls()
 }

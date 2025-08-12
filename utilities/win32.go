@@ -35,7 +35,77 @@ var (
 
 	user32               = syscall.NewLazyDLL("user32.dll")
 	getAsyncKeyStateProc = user32.NewProc("GetAsyncKeyState")
+	enumWindowsProc      = user32.NewProc("EnumWindows")
+	getWindowTextProc    = user32.NewProc("GetWindowTextW")
+	setWindowPosProc     = user32.NewProc("SetWindowPos")
+	moveWindowProc       = user32.NewProc("MoveWindow")
 )
+
+const (
+	SWP_NOMOVE     int16 = 0x2
+	SWP_NOSIZE     int16 = 1
+	SWP_NOZORDER   int16 = 0x4
+	SWP_SHOWWINDOW int   = 0x0040
+)
+
+func MoveWindow(hwnd syscall.Handle, X int, Y int, nWidth int, nHeight int, bRepaint int) (err error) {
+	r1, _, e1 := moveWindowProc.Call(uintptr(hwnd), uintptr(X), uintptr(Y), uintptr(nWidth), uintptr(nHeight), uintptr(bRepaint))
+	if r1 == 0 {
+		if e1 != nil {
+			err = e1
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func enumWindows(enumFunc uintptr, lparam uintptr) (err error) {
+	r1, _, e1 := enumWindowsProc.Call(enumFunc, lparam)
+	if r1 == 0 {
+		if e1 != nil {
+			err = e1
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func FindWindow(title string) (syscall.Handle, error) {
+	var hwnd syscall.Handle
+	cb := syscall.NewCallback(func(h syscall.Handle, p uintptr) uintptr {
+		b := make([]uint16, 200)
+		_, err := getWindowText(h, &b[0], int32(len(b)))
+		if err != nil {
+			// ignore the error
+			return 1 // continue enumeration
+		}
+		if syscall.UTF16ToString(b) == title {
+			// note the window
+			hwnd = h
+			return 0 // stop enumeration
+		}
+		return 1 // continue enumeration
+	})
+	enumWindows(cb, 0)
+	if hwnd == 0 {
+		return 0, fmt.Errorf("No window with title '%s' found", title)
+	}
+	return hwnd, nil
+}
+
+func getWindowText(hwnd syscall.Handle, str *uint16, maxCount int32) (len int32, err error) {
+	r1, _, e1 := getWindowTextProc.Call(uintptr(hwnd), uintptr(unsafe.Pointer(str)), uintptr(maxCount))
+	if r1 == 0 {
+		if e1 != nil {
+			err = e1
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
 
 func getAsyncKeyState(vKey int) int16 {
 	r1, _, _ := getAsyncKeyStateProc.Call(uintptr(vKey))
@@ -44,6 +114,11 @@ func getAsyncKeyState(vKey int) int16 {
 
 func GetKeyDown(vKey int) bool {
 	return (int(getAsyncKeyState(vKey)) & 0x8000) > 0
+}
+
+func SetWindowPos(hWnd syscall.Handle, hWndInsertAfter syscall.Handle, X int, Y int, cX int, cY int, flags uint) (uintptr, error) {
+	ret, _, err := setWindowPosProc.Call(uintptr(hWnd), uintptr(hWndInsertAfter), uintptr(X), uintptr(Y), uintptr(cX), uintptr(cY), uintptr(flags))
+	return ret, err
 }
 
 func GetTerminalSize() (int16, int16) {
